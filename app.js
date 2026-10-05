@@ -8,10 +8,12 @@ const PORT = 3000;
 
 let proximoIdProd = 6;
 let proximoIdForn = 4;
-let proximaVenda = 5;
+let proximoIdVenda = 5;
+let proximoIdMov = 20;
+let proximoIdItem = 12;
 
 app.get ('/', (req, res) => {
-    res.status(200).send('API de gerenciamento de vendas e produtos ar');
+    res.status(200).send('API de gerenciamento de vendas e produtos no ar');
 });
 
 
@@ -108,7 +110,7 @@ app.patch ('/produtos/:id', (req, res) => {
             return res.status(400).json({error: "O fornecedor indicado não existe."});
         }
         
-        prodAlteracao.fornecedorId = novosDados.fornecedorId;
+        prodAlteracao.fornecedorId = Number(novosDados.fornecedorId);
     };
 
     if (novosDados.ativo !== undefined) {
@@ -220,6 +222,105 @@ app.get('/vendas/:id', (req, res) => {
     return res.status(200).json({
         venda: buscaVenda,
         itens: buscaItens
+    });
+});
+
+app.post('/vendas', (req, res) => {
+    const itens = req.body.itens;
+
+    if (!itens || itens.length === 0) {
+        return res.status(400).json({error: "A venda precisa ter pelo menos um produto."});
+    }
+
+    let valorTotal = 0;
+
+    for (let i = 0; i < itens.length; i++) {
+        const produto = produtos.find( p => p.id === Number(itens[i].produtoId) );
+
+        if (!produto) {
+            return res.status(404).json({
+                error: `O produto com identificação ${itens[i].produtoId} não foi encontrado.`
+            });
+        }
+
+        if (!produto.ativo) {
+            return res.status(400).json({error: "O produto está inativo."});
+        }
+
+        const quantidade = itens[i].quantidade;
+
+        if (!Number.isInteger(quantidade) || quantidade <= 0) {
+            return res.status(400).json({
+                error: "A quantidade deve ser um número inteiro maior que zero."
+            });
+        }
+
+        for (let j = 0; j < i; j++) {
+            if (Number(itens[j].produtoId) === produto.id) {
+                return res.status(400).json({
+                    error: `O produto ${produto.nome} foi informado mais de uma vez.`
+                });
+            }
+        }
+
+        if (produto.estoque < quantidade) {
+            return res.status(400).json({
+                error: "Estoque insuficiente para o produto " + produto.nome
+            });
+        }
+
+        valorTotal += produto.preco * quantidade;
+    }
+
+    const novaVenda = {
+        id: proximoIdVenda,
+        data: new Date().toISOString(),
+        valorTotal: valorTotal,
+        status: "finalizada",
+        dataCancelamento: null,
+        motivoCancelamento: null,
+        vendaSubstitutaId: null
+    };
+    proximoIdVenda++;
+    vendas.push(novaVenda);
+
+    for (let i = 0; i < itens.length; i++) {
+        const produto = produtos.find( p => p.id === Number(itens[i].produtoId) );
+
+        const quantidade = itens[i].quantidade;
+        const subtotal = produto.preco * quantidade;
+
+        const novoItem = {
+            id: proximoIdItem,
+            vendaId: novaVenda.id,
+            produtoId: produto.id,
+            nomeProduto: produto.nome,
+            quantidade: quantidade,
+            precoUnitario: produto.preco,
+            subtotal: subtotal
+        };
+        proximoIdItem++;
+        itensVenda.push(novoItem);
+
+        produto.estoque -= quantidade;
+
+        const novaMovimentacao = {
+            id: proximoIdMov,
+            produtoId: produto.id,
+            tipo: "saida",
+            quantidade: quantidade,
+            data: novaVenda.data,
+            fornecedorId: null,
+            vendaId: novaVenda.id,
+            motivo: "Venda"
+        };
+        proximoIdMov++;
+        movimentacoes.push(novaMovimentacao);
+    }
+
+    return res.status(201).json({
+        venda: novaVenda,
+        itens: itensVenda.filter( item => item.vendaId === novaVenda.id )
     });
 });
 
