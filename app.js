@@ -8,6 +8,7 @@ const PORT = 3000;
 
 let proximoIdProd = 6;
 let proximoIdForn = 4;
+let proximaVenda = 5;
 
 app.get ('/', (req, res) => {
     res.status(200).send('API de gerenciamento de vendas e produtos ar');
@@ -196,6 +197,30 @@ app.patch ('/fornecedores/:id', (req, res) => {
     };
 
     return res.status(200).json(fornAlteracao);
+});
+
+
+//-------Vendas-------
+
+
+app.get('/vendas', (req, res) => {
+    return res.status(200).json(vendas);
+});
+
+app.get('/vendas/:id', (req, res) => {
+    const { id } = req.params;
+    const buscaVenda = vendas.find( venda => venda.id === Number(id) );
+
+    if (!buscaVenda){
+        return res.status(404).json({error: "Venda não encontrada."});
+    };
+
+    const buscaItens = itensVenda.filter( item => item.vendaId === buscaVenda.id );
+
+    return res.status(200).json({
+        venda: buscaVenda,
+        itens: buscaItens
+    });
 });
 
 app.listen(PORT, () => {
