@@ -324,6 +324,25 @@ app.post('/vendas', (req, res) => {
     });
 });
 
+app.get('/itensVenda', (req, res) => {
+    return res.status(200).json(itensVenda);
+});
+
+app.get('/movimentacoes', (req, res) => {
+    return res.status(200).json(movimentacoes);
+});
+
+app.get('/movimentacoes/:id', (req, res) => {
+    const { id } = req.params;
+    const buscaMov = movimentacoes.find( m => m.id === Number(id));
+
+    if (!buscaMov) {
+        return res.status(404).json({error: "Movimentação não encontrada"});
+    };
+
+    return res.status(200).json(buscaMov);
+});
+
 app.listen(PORT, () => {
     console.log(`Servidor funcionando na porta ${PORT}`);
 });
