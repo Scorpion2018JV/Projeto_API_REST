@@ -388,6 +388,39 @@ app.post('/movimentacoes/entrada', (req, res) => {
     });
 });
 
+app.get('/estoque', (req, res) => {
+    const estoque = produtos.map(p => ({
+        id: p.id,
+        nome: p.nome,
+        estoque: p.estoque,
+        estoqueMinimo: p.estoqueMinimo
+    }));
+
+    return res.status(200).json(estoque);
+});
+
+app.get('/estoque/baixo', (req, res) => {
+    const produtosAbaixo = produtos.filter(p => p.estoque < p.estoqueMinimo);
+
+    return res.status(200).json(produtosAbaixo);
+});
+
+app.get('/relatorios/vendas', (req, res) => {
+    const { inicio, fim } = req.query;
+
+    let vendasRelatorio = vendas;
+
+    if (inicio) {
+        vendasRelatorio = vendasRelatorio.filter(v => new Date(v.data) >= new Date(inicio));
+    }
+
+    if (fim) {
+        vendasRelatorio = vendasRelatorio.filter(v => new Date(v.data) <= new Date(fim));
+    }
+
+    return res.status(200).json(vendasRelatorio);
+});
+
 app.listen(PORT, () => {
     console.log(`Servidor funcionando na porta ${PORT}`);
 });
