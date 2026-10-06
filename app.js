@@ -37,6 +37,10 @@ app.get ('/produtos/:id', (req, res) => {
 
 app.post ('/produtos', (req, res) => {
     const dados = req.body;
+    if (dados.preco < 0) {
+        return res.status(400).json({error: "O preço não pode ser negativo."});
+    }
+
     const existeFornecedor = fornecedores.find( f => f.id === Number(dados.fornecedorId) );
 
     if (!existeFornecedor){
@@ -45,6 +49,7 @@ app.post ('/produtos', (req, res) => {
 
     const novoProduto = {
         ...dados,
+        fornecedorId: Number(dados.fornecedorId),
         id: proximoIdProd,
         estoque: 0
     };
@@ -80,12 +85,26 @@ app.delete ('/produtos/:id', (req, res) => {
 app.patch ('/produtos/:id', (req, res) => {
     const { id } = req.params;
     const prodAlteracao = produtos.find( p => p.id === Number(id));
+    
+    
 
     if (!prodAlteracao){
         return res.status(404).json({error: "Produto não encontrado."});
     };
 
     const novosDados = req.body;
+
+    if (novosDados.preco !== undefined && novosDados.preco < 0) {
+        return res.status(400).json({error: "O preço não pode ser negativo."});
+    }
+
+    if (novosDados.fornecedorId !== undefined) {
+        const existeFornecedor = fornecedores.find( f => f.id === Number(novosDados.fornecedorId) );
+
+        if (!existeFornecedor) {
+            return res.status(400).json({error: "O fornecedor indicado não existe."});
+        }
+    }
 
     if (novosDados.nome !== undefined) {
         prodAlteracao.nome = novosDados.nome;
@@ -104,12 +123,6 @@ app.patch ('/produtos/:id', (req, res) => {
     };
 
     if (novosDados.fornecedorId !== undefined) {
-        const existeFornecedor = fornecedores.find( f => f.id === Number(novosDados.fornecedorId) );
-
-        if (!existeFornecedor){
-            return res.status(400).json({error: "O fornecedor indicado não existe."});
-        }
-        
         prodAlteracao.fornecedorId = Number(novosDados.fornecedorId);
     };
 
@@ -160,12 +173,11 @@ app.delete ('/fornecedores/:id', (req, res) => {
     };
 
     const produtoVinculado = produtos.find( p => p.fornecedorId === Number(id) );
+    const movimentacaoVinculada = movimentacoes.find( m => m.fornecedorId === Number(id) );
 
-    if (produtoVinculado) {
-        return res.status(409).json(
-            {error: "Não é possível excluir este fornecedor, pois existem produtos vinculados a ele."}
-        );
-    };
+    if (produtoVinculado || movimentacaoVinculada) {
+        return res.status(409).json({error: "Existem produtos ou movimentações vinculados a este fornecedor."});
+    }
 
     const [fornDeletado] = fornecedores.splice(indice, 1);
 
@@ -273,6 +285,8 @@ app.post('/vendas', (req, res) => {
         valorTotal += produto.preco * quantidade;
     }
 
+    valorTotal = Number(valorTotal.toFixed(2));
+
     const novaVenda = {
         id: proximoIdVenda,
         data: new Date().toISOString(),
@@ -289,7 +303,7 @@ app.post('/vendas', (req, res) => {
         const produto = produtos.find( p => p.id === Number(itens[i].produtoId) );
 
         const quantidade = itens[i].quantidade;
-        const subtotal = produto.preco * quantidade;
+        const subtotal = Number((produto.preco * quantidade).toFixed(2));
 
         const novoItem = {
             id: proximoIdItem,
