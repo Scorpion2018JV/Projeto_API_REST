@@ -1,12 +1,12 @@
 import express from 'express'
 import produtosRoutes from './routes/produtos.routes.js';
+import fornecedoresRoutes from './routes/fornecedores.routes.js';
 
 const app = express();
 app.use(express.json());
 
 import { produtos, fornecedores, vendas, itensVenda, movimentacoes } from "./data/dadosTeste.js";
 
-let proximoIdForn = 4;
 let proximoIdVenda = 5;
 let proximoIdMov = 20;
 let proximoIdItem = 12;
@@ -16,85 +16,7 @@ app.get ('/', (req, res) => {
 });
 
 app.use('/produtos', produtosRoutes);
-
-//-------Fornecedores-------
-
-
-app.get ('/fornecedores', (req, res) => {
-    return res.status(200).json(fornecedores);
-});
-
-app.get ('/fornecedores/:id', (req, res) => {
-    const { id } = req.params;
-    const buscaForn = fornecedores.find( p => p.id === Number(id));
-
-    if (!buscaForn) {
-        return res.status(404).json({error: "Fornecedor não encontrado."});
-    };
-
-    return res.status(200).json(buscaForn);
-});
-
-app.post ('/fornecedores', (req, res) => {
-    const novoFornecedor = {
-        ...req.body,
-        id: proximoIdForn,
-    };
-
-    proximoIdForn++;
-    fornecedores.push(novoFornecedor);
-
-    return res.status(201).json(novoFornecedor);
-});
-
-app.delete ('/fornecedores/:id', (req, res) => {
-    const { id } = req.params;
-    const indice = fornecedores.findIndex( p => p.id === Number(id));
-
-    if (indice === -1){
-        return res.status(404).json({error: "Fornecedor não encontrado."});
-    };
-
-    const produtoVinculado = produtos.find( p => p.fornecedorId === Number(id) );
-    const movimentacaoVinculada = movimentacoes.find( m => m.fornecedorId === Number(id) );
-
-    if (produtoVinculado || movimentacaoVinculada) {
-        return res.status(409).json({error: "Existem produtos ou movimentações vinculados a este fornecedor."});
-    }
-
-    const [fornDeletado] = fornecedores.splice(indice, 1);
-
-    return res.status(200).json({message: "Fornecedor deletado com sucesso!", fornDeletado});
-});
-
-app.patch ('/fornecedores/:id', (req, res) => {
-    const { id } = req.params;
-    const fornAlteracao = fornecedores.find( p => p.id === Number(id));
-
-    if (!fornAlteracao){
-        return res.status(404).json({error: "Fornecedor não encontrado."});
-    };
-
-    const novosDados = req.body;
-
-    if (novosDados.nome !== undefined) {
-        fornAlteracao.nome = novosDados.nome;
-    };
-
-    if (novosDados.telefone !== undefined) {
-        fornAlteracao.telefone = novosDados.telefone;
-    };
-
-    if (novosDados.email !== undefined) {
-        fornAlteracao.email = novosDados.email;
-    };
-
-    if (novosDados.ativo !== undefined) {
-        fornAlteracao.ativo = novosDados.ativo;
-    };
-
-    return res.status(200).json(fornAlteracao);
-});
+app.use('/fornecedores', fornecedoresRoutes);
 
 
 //-------Vendas-------

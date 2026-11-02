@@ -2,7 +2,7 @@ import * as service from '../services/produtos.service.js';
 import { ErroDeAplicacao } from '../errors/ErroDeAplicacao.js';
 
 export async function listar(req, res) {
-    res.status(200).json(await service.listar());
+  res.status(200).json(await service.listar());
 }
 
 export async function buscarPorId(req, res) {
