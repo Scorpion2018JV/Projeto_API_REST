@@ -1,12 +1,11 @@
 import express from 'express'
+import produtosRoutes from './routes/produtos.routes.js';
+
 const app = express();
 app.use(express.json());
 
-import { produtos, fornecedores, vendas, itensVenda, movimentacoes } from "./dadosTeste.js";
+import { produtos, fornecedores, vendas, itensVenda, movimentacoes } from "./data/dadosTeste.js";
 
-const PORT = 3000;
-
-let proximoIdProd = 6;
 let proximoIdForn = 4;
 let proximoIdVenda = 5;
 let proximoIdMov = 20;
@@ -16,123 +15,7 @@ app.get ('/', (req, res) => {
     res.status(200).send('API de gerenciamento de vendas e produtos no ar');
 });
 
-
-//-------Produtos-------
-
-
-app.get ('/produtos', (req, res) => {
-    return res.status(200).json(produtos);
-});
-
-app.get ('/produtos/:id', (req, res) => {
-    const { id } = req.params;
-    const buscaProd = produtos.find( p => p.id === Number(id));
-
-    if (!buscaProd) {
-        return res.status(404).json({error: "Produto não encontrado."});
-    };
-
-    return res.status(200).json(buscaProd);
-});
-
-app.post ('/produtos', (req, res) => {
-    const dados = req.body;
-    if (dados.preco < 0) {
-        return res.status(400).json({error: "O preço não pode ser negativo."});
-    }
-
-    const existeFornecedor = fornecedores.find( f => f.id === Number(dados.fornecedorId) );
-
-    if (!existeFornecedor){
-        return res.status(400).json({error: "O fornecedor indicado não existe."});
-    }
-
-    const novoProduto = {
-        ...dados,
-        fornecedorId: Number(dados.fornecedorId),
-        id: proximoIdProd,
-        estoque: 0
-    };
-
-    proximoIdProd++;
-    produtos.push(novoProduto);
-
-    return res.status(201).json(novoProduto);
-});
-
-app.delete ('/produtos/:id', (req, res) => {
-    const { id } = req.params;
-    const indice = produtos.findIndex( p => p.id === Number(id));
-
-    if (indice === -1){
-        return res.status(404).json({error: "Produto não encontrado."});
-    };
-
-    const itemVinculado = itensVenda.find( item => item.produtoId === Number(id) );
-    const movimentacaoVinculada = movimentacoes.find( mov => mov.produtoId === Number(id) );
-
-    if (itemVinculado || movimentacaoVinculada) {
-        return res.status(409).json(
-            {error: "Não é possível excluir este produto, pois existem vendas ou movimentações vinculadas a ele."}
-        );
-    }
-
-    const [prodDeletado] = produtos.splice(indice, 1);
-
-    return res.status(200).json({message: "Produto deletado com sucesso!", prodDeletado});
-});
-
-app.patch ('/produtos/:id', (req, res) => {
-    const { id } = req.params;
-    const prodAlteracao = produtos.find( p => p.id === Number(id));
-    
-    
-
-    if (!prodAlteracao){
-        return res.status(404).json({error: "Produto não encontrado."});
-    };
-
-    const novosDados = req.body;
-
-    if (novosDados.preco !== undefined && novosDados.preco < 0) {
-        return res.status(400).json({error: "O preço não pode ser negativo."});
-    }
-
-    if (novosDados.fornecedorId !== undefined) {
-        const existeFornecedor = fornecedores.find( f => f.id === Number(novosDados.fornecedorId) );
-
-        if (!existeFornecedor) {
-            return res.status(400).json({error: "O fornecedor indicado não existe."});
-        }
-    }
-
-    if (novosDados.nome !== undefined) {
-        prodAlteracao.nome = novosDados.nome;
-    };
-
-    if (novosDados.descricao !== undefined) {
-        prodAlteracao.descricao = novosDados.descricao;
-    };
-
-    if (novosDados.preco !== undefined) {
-        prodAlteracao.preco = novosDados.preco;
-    };
-
-    if (novosDados.estoqueMinimo !== undefined) {
-        prodAlteracao.estoqueMinimo = novosDados.estoqueMinimo;
-    };
-
-    if (novosDados.fornecedorId !== undefined) {
-        prodAlteracao.fornecedorId = Number(novosDados.fornecedorId);
-    };
-
-    if (novosDados.ativo !== undefined) {
-        prodAlteracao.ativo = novosDados.ativo;
-    };
-
-    return res.status(200).json(prodAlteracao);
-});
-
+app.use('/produtos', produtosRoutes);
 
 //-------Fornecedores-------
 
@@ -609,6 +492,4 @@ app.get('/relatorios/vendas', (req, res) => {
     return res.status(200).json(vendasRelatorio);
 });
 
-app.listen(PORT, () => {
-    console.log(`Servidor funcionando na porta ${PORT}`);
-});
+export default app;
