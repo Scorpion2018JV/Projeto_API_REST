@@ -3,6 +3,7 @@ import produtosRoutes from './routes/produtos.routes.js';
 import fornecedoresRoutes from './routes/fornecedores.routes.js';
 import movimentacoesRoutes from './routes/movimentacoes.routes.js';
 import estoqueRoutes from './routes/estoque.routes.js';
+import relatoriosRoutes from './routes/relatorios.routes.js';
 
 const app = express();
 app.use(express.json());
@@ -21,6 +22,7 @@ app.use('/produtos', produtosRoutes);
 app.use('/fornecedores', fornecedoresRoutes);
 app.use('/movimentacoes', movimentacoesRoutes);
 app.use('/estoque', estoqueRoutes);
+app.use('/relatorios', relatoriosRoutes);
 
 
 //-------Vendas-------
@@ -323,22 +325,6 @@ app.patch('/vendas/:id/cancelar', (req, res) => {
 
 app.get('/itensVenda', (req, res) => {
     return res.status(200).json(itensVenda);
-});
-
-app.get('/relatorios/vendas', (req, res) => {
-    const { inicio, fim } = req.query;
-
-    let vendasRelatorio = vendas;
-
-    if (inicio) {
-        vendasRelatorio = vendasRelatorio.filter(v => new Date(v.data) >= new Date(inicio));
-    }
-
-    if (fim) {
-        vendasRelatorio = vendasRelatorio.filter(v => new Date(v.data) <= new Date(fim));
-    }
-
-    return res.status(200).json(vendasRelatorio);
 });
 
 export default app;
