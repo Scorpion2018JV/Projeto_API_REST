@@ -2,6 +2,7 @@ import express from 'express'
 import produtosRoutes from './routes/produtos.routes.js';
 import fornecedoresRoutes from './routes/fornecedores.routes.js';
 import movimentacoesRoutes from './routes/movimentacoes.routes.js';
+import estoqueRoutes from './routes/estoque.routes.js';
 
 const app = express();
 app.use(express.json());
@@ -19,6 +20,7 @@ app.get ('/', (req, res) => {
 app.use('/produtos', produtosRoutes);
 app.use('/fornecedores', fornecedoresRoutes);
 app.use('/movimentacoes', movimentacoesRoutes);
+app.use('/estoque', estoqueRoutes);
 
 
 //-------Vendas-------
@@ -321,23 +323,6 @@ app.patch('/vendas/:id/cancelar', (req, res) => {
 
 app.get('/itensVenda', (req, res) => {
     return res.status(200).json(itensVenda);
-});
-
-app.get('/estoque', (req, res) => {
-    const estoque = produtos.map(p => ({
-        id: p.id,
-        nome: p.nome,
-        estoque: p.estoque,
-        estoqueMinimo: p.estoqueMinimo
-    }));
-
-    return res.status(200).json(estoque);
-});
-
-app.get('/estoque/baixo', (req, res) => {
-    const produtosAbaixo = produtos.filter(p => p.estoque < p.estoqueMinimo);
-
-    return res.status(200).json(produtosAbaixo);
 });
 
 app.get('/relatorios/vendas', (req, res) => {
