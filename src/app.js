@@ -4,6 +4,7 @@ import fornecedoresRoutes from './routes/fornecedores.routes.js';
 import movimentacoesRoutes from './routes/movimentacoes.routes.js';
 import estoqueRoutes from './routes/estoque.routes.js';
 import relatoriosRoutes from './routes/relatorios.routes.js';
+import itensVendaRoutes from './routes/itensVenda.routes.js';
 
 const app = express();
 app.use(express.json());
@@ -23,7 +24,7 @@ app.use('/fornecedores', fornecedoresRoutes);
 app.use('/movimentacoes', movimentacoesRoutes);
 app.use('/estoque', estoqueRoutes);
 app.use('/relatorios', relatoriosRoutes);
-
+app.use('/itensVenda', itensVendaRoutes);
 
 //-------Vendas-------
 
@@ -321,10 +322,6 @@ app.patch('/vendas/:id/cancelar', (req, res) => {
         novaVenda: novaVenda,
         itensNovaVenda: itensVenda.filter( item => item.vendaId === novaVenda.id )
     });
-});
-
-app.get('/itensVenda', (req, res) => {
-    return res.status(200).json(itensVenda);
 });
 
 export default app;
