@@ -1,6 +1,7 @@
 import express from 'express'
 import produtosRoutes from './routes/produtos.routes.js';
 import fornecedoresRoutes from './routes/fornecedores.routes.js';
+import movimentacoesRoutes from './routes/movimentacoes.routes.js';
 
 const app = express();
 app.use(express.json());
@@ -17,6 +18,7 @@ app.get ('/', (req, res) => {
 
 app.use('/produtos', produtosRoutes);
 app.use('/fornecedores', fornecedoresRoutes);
+app.use('/movimentacoes', movimentacoesRoutes);
 
 
 //-------Vendas-------
@@ -319,66 +321,6 @@ app.patch('/vendas/:id/cancelar', (req, res) => {
 
 app.get('/itensVenda', (req, res) => {
     return res.status(200).json(itensVenda);
-});
-
-app.get('/movimentacoes', (req, res) => {
-    return res.status(200).json(movimentacoes);
-});
-
-app.get('/movimentacoes/:id', (req, res) => {
-    const { id } = req.params;
-    const buscaMov = movimentacoes.find( m => m.id === Number(id));
-
-    if (!buscaMov) {
-        return res.status(404).json({error: "Movimentação não encontrada"});
-    };
-
-    return res.status(200).json(buscaMov);
-});
-
-app.post('/movimentacoes/entrada', (req, res) => {
-    const { produtoId, quantidade, fornecedorId, motivo } = req.body;
-
-    const buscaProduto = produtos.find(p => p.id === Number(produtoId));
-
-    if (!buscaProduto) {
-        return res.status(404).json({error: "Produto não encontrado."});
-    }
-
-    const buscaForn = fornecedores.find( f => f.id === Number(fornecedorId) );
-
-    if (!buscaForn) {
-        return res.status(404).json({error: "Fornecedor não encontrado"});
-    };
-
-    if (!Number.isInteger(quantidade) || quantidade <= 0) {
-        return res.status(400).json({error: "A quantidade deve ser um número inteiro maior que zero."});
-    };
-
-    if (!motivo) {
-        return res.status(400).json({error: "Informe o motivo da entrada."});
-    };
-
-    buscaProduto.estoque += quantidade;
-
-    const novaMovimentacao = {
-        id: proximoIdMov,
-        produtoId: buscaProduto.id,
-        tipo: "entrada",
-        quantidade: quantidade,
-        data: new Date().toISOString(),
-        fornecedorId: buscaForn.id,
-        vendaId: null,
-        motivo: motivo
-    };
-
-    proximoIdMov++;
-    movimentacoes.push(novaMovimentacao);
-
-    return res.status(201).json({
-        message: "Entrada de mercadoria registrada com sucesso.",
-        movimentacao: novaMovimentacao,
-    });
 });
 
 app.get('/estoque', (req, res) => {
