@@ -21,3 +21,5 @@ app.use('/estoque', estoqueRoutes);
 app.use('/relatorios', relatoriosRoutes);
 app.use('/itensVenda', itensVendaRoutes);
 app.use('/vendas', vendasRoutes);
+
+export default app;
