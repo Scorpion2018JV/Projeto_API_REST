@@ -1,6 +1,5 @@
 import { ObjectId } from 'mongodb';
 import { obterBanco } from '../config/database.js';
-import { movimentacoes } from '../data/dadosTeste.js';
 
 function colecao() {
   return obterBanco().collection('movimentacoes');
