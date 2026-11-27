@@ -1,75 +1,73 @@
-import { fornecedores, produtos, movimentacoes } from '../data/dadosTeste.js';
+import * as fornecedoresModel from '../models/fornecedores.models.js';
+import * as produtosModel from '../models/produtos.models.js';
+import * as movimentacoesModel from '../models/movimentacoes.models.js';
 import { ErroDeAplicacao } from '../errors/ErroDeAplicacao.js';
 
-let proximoIdForn = 4;
+function apresentar(fornecedor) {
+  const { _id, ...dados } = fornecedor;
+  return { ...dados, id: _id.toString() };
+}
 
 export async function listar() {
-  return fornecedores;
+  const fornecedores = await fornecedoresModel.buscarTodas();
+  return fornecedores.map(apresentar);
 }
 
 export async function buscarPorId(id) {
-  const buscaForn = fornecedores.find(f => f.id === Number(id));
-
-  if (!buscaForn) {
+  const fornecedor = await fornecedoresModel.buscarPorId(id);
+  if (!fornecedor) {
     throw new ErroDeAplicacao(404, 'Fornecedor não encontrado.');
   }
 
-  return buscaForn;
+  return apresentar(fornecedor);
 }
 
 export async function criar(dados) {
-  const novoFornecedor = {
-    ...dados,
-    id: proximoIdForn
-  };
-
-  proximoIdForn++;
-  fornecedores.push(novoFornecedor);
-
-  return novoFornecedor;
+  const dadosFornecedor = {};
+  for (const campo of ['nome', 'cnpj', 'telefone', 'email', 'ativo']) {
+    if (dados[campo] !== undefined) dadosFornecedor[campo] = dados[campo];
+  }
+  const idCriado = await fornecedoresModel.inserir(dadosFornecedor);
+  return buscarPorId(idCriado.toString());
 }
 
 export async function atualizar(id, novosDados) {
-  const fornAlteracao = fornecedores.find(f => f.id === Number(id));
-
-  if (!fornAlteracao) {
+  const fornecedor = await fornecedoresModel.buscarPorId(id);
+  if (!fornecedor) {
     throw new ErroDeAplicacao(404, 'Fornecedor não encontrado.');
   }
 
-  if (novosDados.nome !== undefined) {
-    fornAlteracao.nome = novosDados.nome;
+  const campos = {};
+  for (const campo of ['nome', 'telefone', 'email', 'ativo']) {
+    if (novosDados[campo] !== undefined) campos[campo] = novosDados[campo];
   }
 
-  if (novosDados.telefone !== undefined) {
-    fornAlteracao.telefone = novosDados.telefone;
+  if (Object.keys(campos).length > 0) {
+    await fornecedoresModel.atualizar(id, campos);
   }
-
-  if (novosDados.email !== undefined) {
-    fornAlteracao.email = novosDados.email;
-  }
-
-  if (novosDados.ativo !== undefined) {
-    fornAlteracao.ativo = novosDados.ativo;
-  }
-
-  return fornAlteracao;
+  return buscarPorId(id);
 }
 
 export async function remover(id) {
-  const indice = fornecedores.findIndex(f => f.id === Number(id));
-
-  if (indice === -1) {
+  const fornecedor = await fornecedoresModel.buscarPorId(id);
+  if (!fornecedor) {
     throw new ErroDeAplicacao(404, 'Fornecedor não encontrado.');
   }
 
-  const produtoVinculado = produtos.find(p => p.fornecedorId === Number(id));
-  const movimentacaoVinculada = movimentacoes.find(m => m.fornecedorId === Number(id));
+  const [produtos, movimentacoes] = await Promise.all([
+    produtosModel.buscarTodas(),
+    movimentacoesModel.buscarTodas()
+  ]);
+  const idFornecedor = fornecedor._id.toString();
+  const possuiProduto = produtos.some(produto => produto.fornecedorId?.toString() === idFornecedor);
+  const possuiMovimentacao = movimentacoes.some(
+    movimentacao => movimentacao.fornecedorId?.toString() === idFornecedor
+  );
 
-  if (produtoVinculado || movimentacaoVinculada) {
+  if (possuiProduto || possuiMovimentacao) {
     throw new ErroDeAplicacao(409, 'Existem produtos ou movimentações vinculados a este fornecedor.');
   }
 
-  const [fornDeletado] = fornecedores.splice(indice, 1);
-
-  return fornDeletado;
+  await fornecedoresModel.remover(id);
+  return apresentar(fornecedor);
 }
