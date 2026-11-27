@@ -1,9 +1,13 @@
-import { produtos, vendas, itensVenda } from '../data/dadosTeste.js';
+import * as vendasModel from '../models/vendas.models.js';
+import * as itensVendaModel from '../models/itensVendas.models.js';
+import * as produtosModel from '../models/produtos.models.js';
+import * as movimentacoesModel from '../models/movimentacoes.models.js';
 import { ErroDeAplicacao } from '../errors/ErroDeAplicacao.js';
-import * as movimentacoesService from './movimentacoes.service.js';
 
-let proximoIdVenda = 5;
-let proximoIdItem = 12;
+function apresentar(documento) {
+  const { _id, ...dados } = documento;
+  return { ...dados, id: _id.toString() };
+}
 
 function mesmoDia(dataA, dataB) {
   return (
@@ -13,130 +17,145 @@ function mesmoDia(dataA, dataB) {
   );
 }
 
-function validarItens(itens, itensOriginais = []) {
+async function buscarItensBrutos(vendaId) {
+  const todos = await itensVendaModel.buscarTodas();
+  return todos.filter(item => item.vendaId?.toString() === vendaId);
+}
+
+async function buscarItens(vendaId) {
+  const itens = await buscarItensBrutos(vendaId);
+  return itens.map(apresentar);
+}
+
+async function registrarMovimentacao({ produtoId, tipo, quantidade, data, vendaId, motivo }) {
+  await movimentacoesModel.inserir({
+    produtoId,
+    tipo,
+    quantidade,
+    data,
+    fornecedorId: null,
+    vendaId,
+    motivo
+  });
+}
+
+async function montarVenda(vendaId) {
+  const venda = await vendasModel.buscarPorId(vendaId);
+  return {
+    venda: apresentar(venda),
+    itens: await buscarItens(vendaId)
+  };
+}
+
+async function validarItens(itens, itensOriginais = []) {
   if (!Array.isArray(itens) || itens.length === 0) {
     throw new ErroDeAplicacao(400, 'A nova venda precisa ter pelo menos um produto.');
   }
 
   let valorTotal = 0;
+  const produtosInformados = new Set();
 
-  for (let i = 0; i < itens.length; i++) {
-    const produto = produtos.find(p => p.id === Number(itens[i].produtoId));
-
+  for (const item of itens) {
+    const produto = await produtosModel.buscarPorId(item.produtoId);
     if (!produto) {
-      throw new ErroDeAplicacao(404, `O produto com identificação ${itens[i].produtoId} não foi encontrado.`);
+      throw new ErroDeAplicacao(404, `O produto com identificação ${item.produtoId} não foi encontrado.`);
     }
 
     if (!produto.ativo) {
       throw new ErroDeAplicacao(400, 'O produto está inativo.');
     }
 
-    const quantidade = itens[i].quantidade;
-
-    if (!Number.isInteger(quantidade) || quantidade <= 0) {
+    if (!Number.isInteger(item.quantidade) || item.quantidade <= 0) {
       throw new ErroDeAplicacao(400, 'A quantidade deve ser um número inteiro maior que zero.');
     }
 
-    for (let j = 0; j < i; j++) {
-      if (Number(itens[j].produtoId) === produto.id) {
-        throw new ErroDeAplicacao(400, `O produto ${produto.nome} foi informado mais de uma vez.`);
-      }
+    const idProduto = produto._id.toString();
+    if (produtosInformados.has(idProduto)) {
+      throw new ErroDeAplicacao(400, `O produto ${produto.nome} foi informado mais de uma vez.`);
     }
+    produtosInformados.add(idProduto);
 
     let estoqueDisponivel = produto.estoque;
-
-    for (let j = 0; j < itensOriginais.length; j++) {
-      if (itensOriginais[j].produtoId === produto.id) {
-        estoqueDisponivel += itensOriginais[j].quantidade;
+    for (const original of itensOriginais) {
+      if (original.produtoId?.toString() === idProduto) {
+        estoqueDisponivel += original.quantidade;
       }
     }
 
-    if (estoqueDisponivel < quantidade) {
+    if (estoqueDisponivel < item.quantidade) {
       throw new ErroDeAplicacao(400, 'Estoque insuficiente para o produto ' + produto.nome);
     }
 
-    valorTotal += produto.preco * quantidade;
+    valorTotal += produto.preco * item.quantidade;
   }
 
   return Number(valorTotal.toFixed(2));
 }
 
-function registrarVenda(itens, valorTotal, motivoMovimentacao) {
-  const novaVenda = {
-    id: proximoIdVenda,
-    data: new Date().toISOString(),
-    valorTotal: valorTotal,
+async function registrarVenda(itens, valorTotal, motivoMovimentacao) {
+  const data = new Date().toISOString();
+
+  const idCriado = await vendasModel.inserir({
+    data,
+    valorTotal,
     status: 'finalizada',
     dataCancelamento: null,
     motivoCancelamento: null,
     vendaSubstitutaId: null
-  };
-  proximoIdVenda++;
-  vendas.push(novaVenda);
+  });
+  const vendaId = idCriado.toString();
 
-  for (let i = 0; i < itens.length; i++) {
-    const produto = produtos.find(p => p.id === Number(itens[i].produtoId));
+  for (const item of itens) {
+    const produto = await produtosModel.buscarPorId(item.produtoId);
+    const produtoId = produto._id.toString();
 
-    const quantidade = itens[i].quantidade;
-    const subtotal = Number((produto.preco * quantidade).toFixed(2));
-
-    const novoItem = {
-      id: proximoIdItem,
-      vendaId: novaVenda.id,
-      produtoId: produto.id,
+    await itensVendaModel.inserir({
+      vendaId,
+      produtoId,
       nomeProduto: produto.nome,
-      quantidade: quantidade,
+      quantidade: item.quantidade,
       precoUnitario: produto.preco,
-      subtotal: subtotal
-    };
-    proximoIdItem++;
-    itensVenda.push(novoItem);
+      subtotal: Number((produto.preco * item.quantidade).toFixed(2))
+    });
 
-    produto.estoque -= quantidade;
+    await produtosModel.atualizar(produtoId, { estoque: produto.estoque - item.quantidade });
 
-    movimentacoesService.registrar({
-      produtoId: produto.id,
+    await registrarMovimentacao({
+      produtoId,
       tipo: 'saida',
-      quantidade: quantidade,
-      data: novaVenda.data,
-      fornecedorId: null,
-      vendaId: novaVenda.id,
+      quantidade: item.quantidade,
+      data,
+      vendaId,
       motivo: motivoMovimentacao
     });
   }
 
-  return novaVenda;
+  return vendaId;
 }
 
 export async function listar() {
-  return vendas;
+  const vendas = await vendasModel.buscarTodas();
+  return vendas.map(apresentar);
 }
 
 export async function buscarPorId(id) {
-  const buscaVenda = vendas.find(venda => venda.id === Number(id));
-
-  if (!buscaVenda) {
+  const venda = await vendasModel.buscarPorId(id);
+  if (!venda) {
     throw new ErroDeAplicacao(404, 'Venda não encontrada.');
   }
 
-  const buscaItens = itensVenda.filter(item => item.vendaId === buscaVenda.id);
-
-  return { venda: buscaVenda, itens: buscaItens };
+  return montarVenda(id);
 }
 
-export async function criar({ itens }) {
-  const valorTotal = validarItens(itens);
-  const novaVenda = registrarVenda(itens, valorTotal, 'Venda');
+export async function criar({ itens } = {}) {
+  const valorTotal = await validarItens(itens);
+  const vendaId = await registrarVenda(itens, valorTotal, 'Venda');
 
-  return {
-    venda: novaVenda,
-    itens: itensVenda.filter(item => item.vendaId === novaVenda.id)
-  };
+  return montarVenda(vendaId);
 }
 
 export async function cancelar(id, { motivoCancelamento, itens } = {}) {
-  const venda = vendas.find(v => v.id === Number(id));
-
+  const venda = await vendasModel.buscarPorId(id);
   if (!venda) {
     throw new ErroDeAplicacao(404, 'Venda não encontrada.');
   }
@@ -153,52 +172,57 @@ export async function cancelar(id, { motivoCancelamento, itens } = {}) {
     throw new ErroDeAplicacao(400, 'Informe o motivo do cancelamento.');
   }
 
-  const itensOriginais = itensVenda.filter(item => item.vendaId === venda.id);
+  const vendaId = venda._id.toString();
+  const itensOriginais = await buscarItensBrutos(vendaId);
   const vaiCriarVendaCorrigida = itens !== undefined;
 
   let valorTotalNovaVenda = 0;
-
   if (vaiCriarVendaCorrigida) {
-    valorTotalNovaVenda = validarItens(itens, itensOriginais);
+    valorTotalNovaVenda = await validarItens(itens, itensOriginais);
   }
 
   const dataCancelamento = new Date().toISOString();
 
-  for (let i = 0; i < itensOriginais.length; i++) {
-    const item = itensOriginais[i];
-    const produto = produtos.find(p => p.id === item.produtoId);
+  for (const item of itensOriginais) {
+    const produto = await produtosModel.buscarPorId(item.produtoId);
+    const produtoId = produto._id.toString();
 
-    produto.estoque += item.quantidade;
+    await produtosModel.atualizar(produtoId, { estoque: produto.estoque + item.quantidade });
 
-    movimentacoesService.registrar({
-      produtoId: produto.id,
+    await registrarMovimentacao({
+      produtoId,
       tipo: 'entrada',
       quantidade: item.quantidade,
       data: dataCancelamento,
-      fornecedorId: null,
-      vendaId: venda.id,
+      vendaId,
       motivo: 'Cancelamento de venda'
     });
   }
 
-  venda.status = 'cancelada';
-  venda.dataCancelamento = dataCancelamento;
-  venda.motivoCancelamento = motivoCancelamento;
+  await vendasModel.atualizar(vendaId, {
+    status: 'cancelada',
+    dataCancelamento,
+    motivoCancelamento
+  });
 
   if (!vaiCriarVendaCorrigida) {
+    const vendaCancelada = await vendasModel.buscarPorId(vendaId);
     return {
       message: 'Venda cancelada com sucesso.',
-      vendaCancelada: venda
+      vendaCancelada: apresentar(vendaCancelada)
     };
   }
 
-  const novaVenda = registrarVenda(itens, valorTotalNovaVenda, 'Venda corrigida');
-  venda.vendaSubstitutaId = novaVenda.id;
+  const novaVendaId = await registrarVenda(itens, valorTotalNovaVenda, 'Venda corrigida');
+  await vendasModel.atualizar(vendaId, { vendaSubstitutaId: novaVendaId });
+
+  const vendaCancelada = await vendasModel.buscarPorId(vendaId);
+  const novaVenda = await montarVenda(novaVendaId);
 
   return {
     message: 'Venda cancelada e nova venda corrigida criada com sucesso.',
-    vendaCancelada: venda,
-    novaVenda: novaVenda,
-    itensNovaVenda: itensVenda.filter(item => item.vendaId === novaVenda.id)
+    vendaCancelada: apresentar(vendaCancelada),
+    novaVenda: novaVenda.venda,
+    itensNovaVenda: novaVenda.itens
   };
 }

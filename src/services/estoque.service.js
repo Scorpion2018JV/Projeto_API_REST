@@ -1,8 +1,14 @@
-import { produtos } from '../data/dadosTeste.js';
+import * as produtosModel from '../models/produtos.models.js';
+
+function apresentar(produto) {
+  const { _id, ...dados } = produto;
+  return { ...dados, id: _id.toString() };
+}
 
 export async function listar() {
+  const produtos = await produtosModel.buscarTodas();
   return produtos.map(p => ({
-    id: p.id,
+    id: p._id.toString(),
     nome: p.nome,
     estoque: p.estoque,
     estoqueMinimo: p.estoqueMinimo
@@ -10,5 +16,8 @@ export async function listar() {
 }
 
 export async function baixo() {
-  return produtos.filter(p => p.estoque < p.estoqueMinimo);
+  const produtos = await produtosModel.buscarTodas();
+  return produtos
+    .filter(p => p.estoque < p.estoqueMinimo)
+    .map(apresentar);
 }

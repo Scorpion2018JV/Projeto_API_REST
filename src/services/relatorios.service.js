@@ -1,6 +1,12 @@
-import { vendas } from '../data/dadosTeste.js';
+import * as vendasModel from '../models/vendas.models.js';
+
+function apresentar(venda) {
+  const { _id, ...dados } = venda;
+  return { ...dados, id: _id.toString() };
+}
 
 export async function vendasPorPeriodo({ inicio, fim }) {
+  const vendas = await vendasModel.buscarTodas();
   let vendasRelatorio = vendas;
 
   if (inicio) {
@@ -11,5 +17,5 @@ export async function vendasPorPeriodo({ inicio, fim }) {
     vendasRelatorio = vendasRelatorio.filter(v => new Date(v.data) <= new Date(fim));
   }
 
-  return vendasRelatorio;
+  return vendasRelatorio.map(apresentar);
 }

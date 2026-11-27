@@ -1,59 +1,36 @@
-import { produtos, fornecedores, movimentacoes } from '../data/dadosTeste.js';
+import * as movimentacoesModel from '../models/movimentacoes.models.js';
+import * as produtosModel from '../models/produtos.models.js';
+import * as fornecedoresModel from '../models/fornecedores.models.js';
 import { ErroDeAplicacao } from '../errors/ErroDeAplicacao.js';
 
-let proximoIdMov = 20;
+function apresentar(movimentacao) {
+  const { _id, ...dados } = movimentacao;
+  return { ...dados, id: _id.toString() };
+}
 
 export async function listar() {
-  return movimentacoes;
+  const movimentacoes = await movimentacoesModel.buscarTodas();
+  return movimentacoes.map(apresentar);
 }
 
 export async function buscarPorId(id) {
-  const buscaMov = movimentacoes.find(m => m.id === Number(id));
-
-  if (!buscaMov) {
-    throw new ErroDeAplicacao(404, 'Movimentação não encontrada');
+  const movimentacao = await movimentacoesModel.buscarPorId(id);
+  if (!movimentacao) {
+    throw new ErroDeAplicacao(404, 'Movimentação não encontrada.');
   }
 
-  return buscaMov;
-}
-
-export function registrar({
-  produtoId,
-  tipo,
-  quantidade,
-  data = new Date().toISOString(),
-  fornecedorId = null,
-  vendaId = null,
-  motivo
-}) {
-  const novaMovimentacao = {
-    id: proximoIdMov,
-    produtoId,
-    tipo,
-    quantidade,
-    data,
-    fornecedorId,
-    vendaId,
-    motivo
-  };
-
-  proximoIdMov++;
-  movimentacoes.push(novaMovimentacao);
-
-  return novaMovimentacao;
+  return apresentar(movimentacao);
 }
 
 export async function registrarEntrada({ produtoId, quantidade, fornecedorId, motivo }) {
-  const buscaProduto = produtos.find(p => p.id === Number(produtoId));
-
-  if (!buscaProduto) {
+  const produto = await produtosModel.buscarPorId(produtoId);
+  if (!produto) {
     throw new ErroDeAplicacao(404, 'Produto não encontrado.');
   }
 
-  const buscaForn = fornecedores.find(f => f.id === Number(fornecedorId));
-
-  if (!buscaForn) {
-    throw new ErroDeAplicacao(404, 'Fornecedor não encontrado');
+  const fornecedor = await fornecedoresModel.buscarPorId(fornecedorId);
+  if (!fornecedor) {
+    throw new ErroDeAplicacao(404, 'Fornecedor não encontrado.');
   }
 
   if (!Number.isInteger(quantidade) || quantidade <= 0) {
@@ -64,14 +41,18 @@ export async function registrarEntrada({ produtoId, quantidade, fornecedorId, mo
     throw new ErroDeAplicacao(400, 'Informe o motivo da entrada.');
   }
 
-  buscaProduto.estoque += quantidade;
+  const idProduto = produto._id.toString();
+  await produtosModel.atualizar(idProduto, { estoque: produto.estoque + quantidade });
 
-  return registrar({
-    produtoId: buscaProduto.id,
+  const idCriado = await movimentacoesModel.inserir({
+    produtoId: idProduto,
     tipo: 'entrada',
     quantidade,
-    fornecedorId: buscaForn.id,
+    data: new Date().toISOString(),
+    fornecedorId: fornecedor._id.toString(),
     vendaId: null,
     motivo
   });
+
+  return buscarPorId(idCriado.toString());
 }
